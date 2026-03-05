@@ -1,0 +1,43 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: admin-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: admin-user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/admin/users/**
+        - id: admin-audit-service
+          uri: lb://audit-service
+          predicates:
+            - Path=/api/admin/audit/**
+        - id: admin-scheduler-service
+          uri: lb://scheduler-service
+          predicates:
+            - Path=/api/admin/scheduler/**
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG
