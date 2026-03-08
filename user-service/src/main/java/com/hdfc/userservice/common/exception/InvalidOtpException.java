@@ -10,7 +10,21 @@ package com.hdfc.userservice.common.exception;
  */
 public class InvalidOtpException extends UserServiceException {
 
+    /**
+     * Constructs with the default message — used when a submitted
+     * TOTP code is simply wrong or expired during normal validation.
+     */
     public InvalidOtpException() {
         super("Invalid or expired OTP code. Please try again.");
+    }
+
+    /**
+     * Constructs with a specific message — used when a more descriptive
+     * reason is available, such as an expired setup session.
+     *
+     * @param reason a specific description of why the OTP was rejected
+     */
+    public InvalidOtpException(String reason) {
+        super(reason);
     }
 }
