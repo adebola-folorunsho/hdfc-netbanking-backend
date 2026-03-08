@@ -4,42 +4,47 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = {
-        "jwt.secret=dGVzdFNlY3JldEtleUZvckFkbWluR2F0ZXdheVRlc3Rpbmc=",
-        "eureka.client.enabled=false",
-        "spring.cloud.gateway.discovery.locator.enabled=false"
-})
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
 class AdminJwtAuthenticationFilterTest {
 
-    @LocalServerPort
-    private int port;
-
-    @Autowired
-    private WebTestClient webTestClient;
-
-    // test secret — matches the one in @TestPropertySource above
-    private static final String TEST_SECRET = "dGVzdFNlY3JldEtleUZvckFkbWluR2F0ZXdheVRlc3Rpbmc=";
+    private static final String TEST_SECRET = "dGVzdFNlY3JldEtleUZvckFkbWluR2F0ZXdheVRlc3RpbmdLZXkxMjM0NTY=";
     private static final String ROLE_CLAIM = "role";
 
     private SecretKey secretKey;
 
+    // Manually construct the filter with a real JwtProperties
+    private AdminJwtAuthenticationFilter filter;
+
+    @Mock
+    private GatewayFilterChain chain;
+
     @BeforeEach
     void setUp() {
         secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(TEST_SECRET));
+        JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setSecret(TEST_SECRET);
+        filter = new AdminJwtAuthenticationFilter(jwtProperties);
     }
 
     private String generateToken(String role, Date expiry) {
@@ -55,34 +60,48 @@ class AdminJwtAuthenticationFilterTest {
     @Test
     @DisplayName("Should reject request with no Authorization header — 401")
     void shouldRejectRequestWithNoAuthorizationHeader() {
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
-                .exchange()
-                .expectStatus().isUnauthorized();
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     @DisplayName("Should reject request with malformed Authorization header — 401")
     void shouldRejectRequestWithMalformedAuthorizationHeader() {
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "InvalidHeader")
-                .exchange()
-                .expectStatus().isUnauthorized();
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     @DisplayName("Should reject request with expired token — 401")
     void shouldRejectRequestWithExpiredToken() {
-        // Token expired 1 hour ago
         Date expiredDate = new Date(System.currentTimeMillis() - 3600000);
         String expiredToken = generateToken("ROLE_ADMIN", expiredDate);
 
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
-                .exchange()
-                .expectStatus().isUnauthorized();
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
@@ -91,11 +110,16 @@ class AdminJwtAuthenticationFilterTest {
         Date futureDate = new Date(System.currentTimeMillis() + 900000);
         String customerToken = generateToken("ROLE_CUSTOMER", futureDate);
 
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + customerToken)
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.FORBIDDEN);
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
@@ -104,28 +128,36 @@ class AdminJwtAuthenticationFilterTest {
         Date futureDate = new Date(System.currentTimeMillis() + 900000);
         String tellerToken = generateToken("ROLE_TELLER", futureDate);
 
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tellerToken)
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.FORBIDDEN);
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
-    @DisplayName("Should allow request with valid ROLE_ADMIN token — not 401 or 403")
+    @DisplayName("Should allow request with valid ROLE_ADMIN token — chain proceeds")
     void shouldAllowRequestWithAdminRole() {
         Date futureDate = new Date(System.currentTimeMillis() + 900000);
         String adminToken = generateToken("ROLE_ADMIN", futureDate);
 
-        // We expect the filter to pass — the request may fail downstream
-        // because there is no real User Service running, but it must not
-        // be rejected by the security filter itself (not 401 or 403)
-        webTestClient.get()
-                .uri("/api/v1/admin/users")
+        // Stub chain only here — this is the only test that reaches chain.filter()
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .exchange()
-                .expectStatus().value(status ->
-                        org.junit.jupiter.api.Assertions.assertNotEquals(401, status)
-                );
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 }
