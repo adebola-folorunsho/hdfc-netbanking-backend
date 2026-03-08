@@ -1,0 +1,15 @@
+jwt:
+  secret: dGVzdFNlY3JldEtleUZvckFkbWluR2F0ZXdheVRlc3RpbmdLZXkxMjM0NTY=
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false

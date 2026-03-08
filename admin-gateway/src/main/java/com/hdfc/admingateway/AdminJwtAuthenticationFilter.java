@@ -4,7 +4,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.io.Decoders;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -32,8 +31,11 @@ public class AdminJwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String ROLE_CLAIM = "role";
     private static final String REQUIRED_ROLE = "ROLE_ADMIN";
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
+    private final JwtProperties jwtProperties;
+
+    public AdminJwtAuthenticationFilter(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -71,8 +73,7 @@ public class AdminJwtAuthenticationFilter implements GlobalFilter, Ordered {
      * JJWT automatically verifies the signature and expiry claim.
      */
     private Claims extractClaims(String token) {
-        SecretKey secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
-        return Jwts.parser()
+        SecretKey secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.getSecret()));        return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
