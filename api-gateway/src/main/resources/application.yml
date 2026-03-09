@@ -7,34 +7,65 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: user-service
+        # ─────────────────────────────────────────────────────────
+        # User Service — all four path groups
+        # Split into separate route entries so each path group
+        # is explicit and independently maintainable.
+        # ─────────────────────────────────────────────────────────
+        - id: user-service-users
           uri: lb://user-service
           predicates:
-            - Path=/api/users/**
+            - Path=/api/v1/users/**
+
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/auth/**
+
+        - id: user-service-2fa
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/2fa/**
+
+        - id: user-service-roles
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/roles/**
+
+        # ─────────────────────────────────────────────────────────
+        # Other services — updated to /api/v1/ prefix to match
+        # the versioning convention established by User Service
+        # ─────────────────────────────────────────────────────────
         - id: account-service
           uri: lb://account-service
           predicates:
-            - Path=/api/accounts/**
+            - Path=/api/v1/accounts/**
+
         - id: transaction-service
           uri: lb://transaction-service
           predicates:
-            - Path=/api/transactions/**
+            - Path=/api/v1/transactions/**
+
         - id: audit-service
           uri: lb://audit-service
           predicates:
-            - Path=/api/audit/**
+            - Path=/api/v1/audit/**
+
         - id: notification-service
           uri: lb://notification-service
           predicates:
-            - Path=/api/notifications/**
+            - Path=/api/v1/notifications/**
+
         - id: scheduler-service
           uri: lb://scheduler-service
           predicates:
-            - Path=/api/scheduler/**
+            - Path=/api/v1/scheduler/**
+
         - id: currency-service
           uri: lb://currency-service
           predicates:
-            - Path=/api/currency/**
+            - Path=/api/v1/currency/**
+
       discovery:
         locator:
           enabled: true
