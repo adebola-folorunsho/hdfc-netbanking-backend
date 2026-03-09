@@ -1,0 +1,148 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.6.1">
+  <diagram name="Page-1" id="WfJ4YSWvlmJxE-IxZfP2">
+    <mxGraphModel dx="1090" dy="581" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="HDFC NetBanking — Deployment Diagram" vertex="1">
+          <mxGeometry height="40" width="900" x="650" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;" value="" vertex="1">
+          <mxGeometry height="440" width="490" x="40" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="z1l" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontStyle=1;" value="Local Development (Docker Compose)" vertex="1">
+          <mxGeometry height="25" width="490" x="40" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="z1s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontStyle=2;" value="docker-compose.yml" vertex="1">
+          <mxGeometry height="20" width="200" x="65" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql_local" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;verticalAlign=top;" value="MySQL 8.0&#xa;port: 3306&#xa;container: hdfc-mysql&#xa;&#xa;hdfc_user_db&#xa;hdfc_account_db&#xa;hdfc_transaction_db&#xa;hdfc_audit_db&#xa;hdfc_notification_db&#xa;hdfc_scheduler_db&#xa;hdfc_currency_db" vertex="1">
+          <mxGeometry height="220" width="185" x="70" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="redis_local" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;verticalAlign=top;" value="Redis 7.2&#xa;port: 6379&#xa;container: hdfc-redis&#xa;&#xa;JWT tokens&#xa;OTP codes&#xa;Session data&#xa;Account balances&#xa;Exchange rates" vertex="1">
+          <mxGeometry height="220" width="185" x="285" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="vol" parent="1" style="text;html=1;strokeColor=#6c8ebf;fillColor=#ffffff;align=center;fontSize=10;rounded=1;" value="Volumes: mysql_data, redis_data   |   Network: hdfc-network (bridge)" vertex="1">
+          <mxGeometry height="35" width="400" x="70" y="375" as="geometry" />
+        </mxCell>
+        <mxCell id="z3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;" value="" vertex="1">
+          <mxGeometry height="210" width="490" x="40" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="z3l" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontStyle=1;" value="Production — Vercel (Frontend)" vertex="1">
+          <mxGeometry height="25" width="490" x="40" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="portal" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" value="React Customer Portal&#xa;Vite + TailwindCSS&#xa;&#xa;Deployed on Vercel&#xa;&#xa;→ API Gateway :8080" vertex="1">
+          <mxGeometry height="140" width="185" x="70" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="admin_panel" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="React Admin Panel&#xa;Vite + TailwindCSS&#xa;&#xa;Deployed on Vercel&#xa;&#xa;→ Admin Gateway :8090" vertex="1">
+          <mxGeometry height="140" width="185" x="285" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="text;html=1;strokeColor=#cccccc;fillColor=#ffffff;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="Legend&#xa;&#xa;🔵  Frontend (Vercel)&#xa;🟢  Backend (Railway)&#xa;🔴  MySQL Databases&#xa;🟠  Cache / Messaging&#xa;⬜  External API&#xa;&#xa;- - -  Data / cache flow&#xa;———  Request routing" vertex="1">
+          <mxGeometry height="200" width="230" x="40" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="z2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;" value="" vertex="1">
+          <mxGeometry height="840" width="1560" x="600" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="z2l" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontStyle=1;" value="Production — Railway (Backend)" vertex="1">
+          <mxGeometry height="25" width="1560" x="600" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql_prod" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;" value="Managed MySQL 8&#xa;(Railway Plugin)&#xa;&#xa;All 7 databases" vertex="1">
+          <mxGeometry height="100" width="185" x="640" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="redis_prod" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Managed Redis&#xa;(Railway Plugin)&#xa;&#xa;Shared cache" vertex="1">
+          <mxGeometry height="100" width="185" x="870" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="kafka" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;" value="Apache Kafka&#xa;(Upstash — Free Tier)&#xa;&#xa;TRANSACTION_CREATED&#xa;FRAUD_ALERT" vertex="1">
+          <mxGeometry height="100" width="185" x="1100" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="eureka" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;" value="Eureka Server&#xa;port: 8761&#xa;&#xa;Service Discovery&#xa;All services register" vertex="1">
+          <mxGeometry height="100" width="185" x="1330" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="exchangerate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;" value="ExchangeRate-API&#xa;(External — Free Tier)&#xa;&#xa;Live exchange rates" vertex="1">
+          <mxGeometry height="100" width="185" x="1560" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="api_gw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" value="API Gateway&#xa;port: 8080&#xa;&#xa;Customer-facing traffic&#xa;Routes to: User, Account,&#xa;Transaction, Currency,&#xa;Notification" vertex="1">
+          <mxGeometry height="140" width="185" x="640" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="admin_gw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Admin Gateway&#xa;port: 8090&#xa;&#xa;Admin-only traffic&#xa;ADMIN role enforced&#xa;Routes to: User, Audit,&#xa;Scheduler" vertex="1">
+          <mxGeometry height="140" width="185" x="870" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="currency" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Currency Service&#xa;port: 8087&#xa;&#xa;Fetches live rates&#xa;Caches in Redis (1hr TTL)" vertex="1">
+          <mxGeometry height="110" width="185" x="1560" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="user_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="User Service&#xa;port: 8081" vertex="1">
+          <mxGeometry height="70" width="155" x="640" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="account_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Account Service&#xa;port: 8082" vertex="1">
+          <mxGeometry height="70" width="155" x="830" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="txn_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Transaction Service&#xa;port: 8083" vertex="1">
+          <mxGeometry height="70" width="155" x="1020" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="audit_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Audit Service&#xa;port: 8084" vertex="1">
+          <mxGeometry height="70" width="155" x="1210" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="notif_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Notification Service&#xa;port: 8085" vertex="1">
+          <mxGeometry height="70" width="155" x="1400" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="sched_svc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" value="Scheduler Service&#xa;port: 8086" vertex="1">
+          <mxGeometry height="70" width="155" x="1590" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="envvars" parent="1" style="text;html=1;strokeColor=#82b366;fillColor=#ffffff;align=center;fontSize=10;rounded=1;" value="Environment Variables (Railway Dashboard):   JWT_SECRET   |   MYSQL_URL   |   REDIS_URL   |   KAFKA_BOOTSTRAP_SERVERS   |   EXCHANGERATE_API_KEY" vertex="1">
+          <mxGeometry height="40" width="1490" x="640" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" edge="1" parent="1" source="portal" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" target="api_gw" value="HTTPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" edge="1" parent="1" source="admin_panel" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" target="admin_gw" value="HTTPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" edge="1" parent="1" source="api_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="user_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" edge="1" parent="1" source="api_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="account_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" edge="1" parent="1" source="api_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="txn_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" edge="1" parent="1" source="admin_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="user_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a7" edge="1" parent="1" source="admin_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="audit_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a8" edge="1" parent="1" source="admin_gw" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sched_svc" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a9" edge="1" parent="1" source="user_svc" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#b85450;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="mysql_prod" value="reads/writes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a10" edge="1" parent="1" source="user_svc" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#d6b656;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;" target="redis_prod" value="cache">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a11" edge="1" parent="1" source="account_svc" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#d6b656;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="redis_prod" value="cache">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a12" edge="1" parent="1" source="currency" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#d6b656;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="redis_prod" value="cache">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a13" edge="1" parent="1" source="currency" style="edgeStyle=orthogonalEdgeStyle;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="exchangerate" value="REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a14" edge="1" parent="1" source="txn_svc" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="kafka" value="publishes events">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a15" edge="1" parent="1" source="kafka" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="audit_svc" value="consumes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a16" edge="1" parent="1" source="kafka" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="notif_svc" value="consumes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a17" edge="1" parent="1" source="api_gw" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#9673a6;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="eureka" value="all services register">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
