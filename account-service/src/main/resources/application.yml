@@ -2,6 +2,9 @@ server:
   port: 8082
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   application:
     # This name is how this service registers itself with Eureka.
     # The API Gateway and Transaction Service use this exact name
@@ -34,7 +37,8 @@ spring:
       max-lifetime: 1800000
 
   jpa:
-    database-platform: org.hibernate.dialect.MySQL8Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
     hibernate:
       # update: auto-creates/alters tables from entities during dev.
       # MUST be switched to validate before merging to main.
