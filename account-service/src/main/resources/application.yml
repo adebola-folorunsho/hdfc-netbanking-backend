@@ -43,7 +43,7 @@ spring:
       # update: auto-creates/alters tables from entities during dev.
       # MUST be switched to validate before merging to main.
       # Schema changes in production are managed explicitly.
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
@@ -56,7 +56,7 @@ spring:
     # Prints SQL to console during dev.
     # MUST be set to false before merging to main —
     # SQL logs can leak sensitive financial data.
-    show-sql: true
+    show-sql: false
 
   data:
     redis:
