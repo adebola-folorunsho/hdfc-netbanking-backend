@@ -1,0 +1,126 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    # This name is how this service registers itself with Eureka.
+    # The API Gateway and Transaction Service use this exact name
+    # when making load-balanced calls: lb://account-service
+    name: account-service
+
+  datasource:
+    # Each service owns its own database — database-per-service principle.
+    # Account Service never touches hdfc_user_db.
+    # You will need to create hdfc_account_db manually — reminder
+    # will be given at the database setup step.
+    url: jdbc:mysql://localhost:3306/hdfc_account_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: hdfc_user
+    password: hdfc_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+    hikari:
+      pool-name: AccountServiceHikariPool
+      # Maximum connections in the pool. Sized for local dev —
+      # determine production value via load testing.
+      maximum-pool-size: 10
+      minimum-idle: 10
+      # 30 seconds — how long a caller waits for a connection
+      # before SQLException is thrown.
+      connection-timeout: 30000
+      # 10 minutes — how long an idle connection is kept alive.
+      idle-timeout: 600000
+      # 30 minutes — must be shorter than MySQL's wait_timeout
+      # (default 8 hours) to prevent stale connection errors.
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      # update: auto-creates/alters tables from entities during dev.
+      # MUST be switched to validate before merging to main.
+      # Schema changes in production are managed explicitly.
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        # Required for batching to work with IDENTITY generation.
+        # Without these two, Hibernate silently disables batching.
+        order_inserts: true
+        order_updates: true
+    # Prints SQL to console during dev.
+    # MUST be set to false before merging to main —
+    # SQL logs can leak sensitive financial data.
+    show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          # -1ms means wait indefinitely when pool is exhausted.
+          # Set a finite timeout before going to production.
+          max-wait: -1ms
+
+  cache:
+    # Redis is the cache provider for account balances.
+    # Strategy: Write-Through — every balance update writes to
+    # both Redis and MySQL simultaneously.
+    type: redis
+    redis:
+      # 30-second TTL — safety net against cache inconsistency.
+      # Cache key pattern: account:balance:{accountId}
+      time-to-live: 30000
+      use-key-prefix: true
+      # Never cache null values — a null balance is an error
+      # condition and must never be silently served to callers.
+      cache-null-values: false
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    # Use IP address to avoid hostname resolution failures
+    # in local dev environments.
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+
+jwt:
+  # Resolved from JWT_SECRET environment variable at startup.
+  # Must match User Service secret exactly — Account Service
+  # validates tokens but never issues them.
+  # Application will refuse to start if JWT_SECRET is not set.
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Eureka requires /actuator/health to mark this
+        # service as UP in the registry.
+        include: health,info
+  endpoint:
+    health:
+      # Show full Redis + MySQL health component details.
+      # Restrict to when-authorized before going to production.
+      show-details: always
+
+logging:
+  level:
+    com.hdfc.accountservice: DEBUG
+    # INFO prevents Spring Security from flooding the console
+    # with one log line per filter per request.
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
