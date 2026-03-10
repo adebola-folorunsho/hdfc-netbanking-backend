@@ -79,6 +79,12 @@ public class JwtServiceImpl implements JwtService {
                 .findFirst()
                 .ifPresent(role ->
                         extraClaims.put("role", "ROLE_" + role.name()));
+        // Add userId as a custom claim so downstream services (Account Service,
+        // Transaction Service etc.) can extract the user's ID directly from the
+        // JWT without making a REST call back to User Service.
+        // Value is the user's Long ID converted to String — consistent with
+        // how JJWT serialises custom claims.
+        extraClaims.put("userId", String.valueOf(user.getId()));
 
         return buildToken(extraClaims, user.getEmail(), accessTokenExpiration);
     }
