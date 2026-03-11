@@ -1,0 +1,146 @@
+server:
+  port: 8083
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  application:
+    # Registers with Eureka as "transaction-service".
+    # Account Service is discovered via lb://account-service.
+    # API Gateway routes /api/v1/transactions/** here.
+    name: transaction-service
+
+  datasource:
+    # Transaction Service owns hdfc_transaction_db exclusively.
+    # Never touches hdfc_account_db or hdfc_user_db directly —
+    # cross-service data access goes through REST calls only.
+    url: jdbc:mysql://localhost:3306/hdfc_transaction_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: hdfc_user
+    password: hdfc_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+    hikari:
+      pool-name: TransactionServiceHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+    hibernate:
+      # update during development — switch to validate before merge.
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      # Each transaction event is serialised as JSON.
+      # StringSerializer for keys (transaction ID as string).
+      # JsonSerializer for values (event payload as JSON).
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # ACKS_ALL: producer waits for all in-sync replicas to
+      # acknowledge before considering the send successful.
+      # Critical for a banking system — we never want to lose
+      # a TRANSACTION_CREATED event silently.
+      acks: all
+      # Retry up to 3 times on transient failures before giving up.
+      retries: 3
+      properties:
+        # Idempotent producer — guarantees exactly-once delivery
+        # to a single partition even if retries occur.
+        # Requires acks=all.
+        enable.idempotence: true
+        # Maximum time to wait for a send to complete.
+        delivery.timeout.ms: 120000
+        # Maximum time the producer will wait before sending
+        # a batch, even if the batch is not full.
+        linger.ms: 5
+
+# ─────────────────────────────────────────────────────────────────────
+# ACCOUNT SERVICE CLIENT
+# ─────────────────────────────────────────────────────────────────────
+account-service:
+  # Base URL for Account Service REST calls via WebClient.
+  # lb:// prefix enables Eureka load-balanced routing.
+  # Transaction Service calls these endpoints as Saga orchestrator:
+  #   GET  /api/v1/accounts/{id}/balance  — pre-transfer balance check
+  #   POST /api/v1/accounts/{id}/debit    — debit source account
+  #   POST /api/v1/accounts/{id}/credit   — credit destination account
+  base-url: lb://account-service
+
+# ─────────────────────────────────────────────────────────────────────
+# PAYSTACK
+# ─────────────────────────────────────────────────────────────────────
+paystack:
+  # Paystack sandbox secret key — loaded from environment variable.
+  # Never hardcode API keys. Obtain from:
+  # https://dashboard.paystack.com/#/settings/developers
+  # Sandbox keys start with "sk_test_"
+  secret-key: ${PAYSTACK_SECRET_KEY}
+  # Paystack API base URL — same for sandbox and production.
+  # Sandbox vs production is determined by the key prefix (sk_test_ vs sk_live_).
+  base-url: https://api.paystack.co
+  # Paystack webhook secret for verifying webhook signatures.
+  # Set in Paystack dashboard under Settings > API Keys & Webhooks.
+  webhook-secret: ${PAYSTACK_WEBHOOK_SECRET}
+
+# ─────────────────────────────────────────────────────────────────────
+# EUREKA
+# ─────────────────────────────────────────────────────────────────────
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+
+# ─────────────────────────────────────────────────────────────────────
+# JWT
+# ─────────────────────────────────────────────────────────────────────
+jwt:
+  # Must match User Service and Account Service JWT_SECRET exactly.
+  # Transaction Service validates tokens — never issues them.
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+# ─────────────────────────────────────────────────────────────────────
+# ACTUATOR
+# ─────────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ─────────────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.hdfc.transactionservice: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+    # INFO for Kafka to avoid verbose producer/consumer lifecycle logs.
+    org.apache.kafka: INFO

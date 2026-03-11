@@ -3,17 +3,239 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- ─────────────────────────────────────────────────────────────────
+         Inherit version management from the parent POM.
+         Gives us Spring Boot 3.2.3, Spring Cloud 2023.0.1, Java 21.
+         ───────────────────────────────────────────────────────────────── -->
     <parent>
         <groupId>com.hdfc</groupId>
         <artifactId>hdfc-netbanking</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>transaction-service</artifactId>
     <name>Transaction Service</name>
-    <description>Transaction Service</description>
+    <description>
+        Fund transfers, Paystack payment gateway integration (NGN sandbox),
+        transaction history, and multi-currency support for HDFC NetBanking.
+    </description>
+
+    <dependencies>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING BOOT WEB
+             Embeds Tomcat and enables REST controllers over HTTP.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING DATA JPA
+             ORM layer — maps entities to MySQL 8 via Hibernate.
+             Provides @Transactional, repositories, JPQL support.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             MYSQL DRIVER
+             JDBC driver loaded by Hibernate at runtime via JDBC SPI.
+             runtime scope — never imported directly in Java code.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING SECURITY
+             JWT filter chain and @PreAuthorize support.
+             Transaction Service validates JWTs issued by User Service —
+             it never issues tokens itself.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             JJWT 0.12.6 — must match User Service and Account Service
+             jjwt-api     — compile time interfaces
+             jjwt-impl    — runtime implementation
+             jjwt-jackson — JSON serialisation of JWT claims
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             EUREKA CLIENT
+             Registers as "transaction-service" with Eureka Server.
+             Enables lb://account-service discovery for WebClient calls
+             to Account Service debit/credit endpoints.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING WEBFLUX — WebClient only
+             Transaction Service calls Account Service via WebClient
+             for balance checks, debits, and credits as part of the
+             Saga orchestration flow.
+             Not building a reactive app — WebClient coexists with
+             spring-boot-starter-web on the same Tomcat instance.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING KAFKA
+             Transaction Service is a Kafka producer only.
+             Publishes TRANSACTION_CREATED events consumed by:
+               - Audit Service (Phase 4)
+               - Notification Service (Phase 5)
+             Also publishes FRAUD_ALERT events from the fraud
+             detection pipeline (Phase 5).
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             JAVA MONEY API — JSR-354
+             javamoney-moneta is the reference implementation of
+             JSR-354 (Java Money and Currency API).
+             Used in Transaction Service for multi-currency conversion
+             arithmetic — NGN is the primary currency.
+             Currency conversion rates come from Currency Service
+             (Phase 7). Exchange rate at time-of-transaction is
+             logged for auditability per Section 6 of the project spec.
+             NOT included in Account Service — Account Service uses
+             BigDecimal + HALF_EVEN only (master planning decision).
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.javamoney</groupId>
+            <artifactId>moneta</artifactId>
+            <version>1.4.4</version>
+            <type>pom</type>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             HIBERNATE ENVERS
+             Audit revision tables for Transaction entity.
+             Envers-ready for Audit Service (Phase 4).
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-envers</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             VALIDATION
+             Activates @Valid, @NotNull, @DecimalMin etc. on request
+             DTOs. Without this starter, Bean Validation annotations
+             are silently ignored at runtime.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             ACTUATOR
+             Exposes /actuator/health for Eureka health checks.
+             Without this, Eureka marks the service as OUT_OF_SERVICE.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             LOMBOK
+             Compile-time annotation processor.
+             optional=true prevents transitive dependency leakage.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             TESTING
+             spring-boot-starter-test: JUnit 5, Mockito, AssertJ,
+             MockMvc for unit and slice tests.
+             spring-security-test: @WithMockUser and security test
+             support for secured endpoint tests.
+             spring-kafka-test: EmbeddedKafkaBroker for Kafka
+             producer tests without a real Kafka instance.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- ─────────────────────────────────────────────────────────
+                 SPRING BOOT MAVEN PLUGIN
+                 Packages as executable fat JAR.
+                 Lombok excluded from final JAR — compile-only tool.
+                 ───────────────────────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
