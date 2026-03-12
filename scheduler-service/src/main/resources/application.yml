@@ -1,0 +1,88 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: scheduler-service
+
+  # ─────────────────────────────────────────────────────────────────
+  # MySQL datasource — hdfc_scheduler_db
+  # Separate database per service — never shares a DB with other
+  # services. Database-per-service is a strict microservices rule.
+  # ─────────────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/hdfc_scheduler_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # ─────────────────────────────────────────────────────────────────
+  # JPA / Hibernate
+  # ddl-auto: update — creates/updates tables on startup.
+  # ─────────────────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # ─────────────────────────────────────────────────────────────────
+  # Kafka producer configuration
+  # Upstash Kafka — SASL_SSL for secure cloud connection.
+  # Scheduler Service is a producer only — publishes statement-events.
+  # ─────────────────────────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
+
+# ─────────────────────────────────────────────────────────────────
+# Kafka topic names
+# Centralised here so topic names are never hardcoded in Java.
+# ─────────────────────────────────────────────────────────────────
+kafka:
+  topics:
+    statement-events: statement-events
+
+# ─────────────────────────────────────────────────────────────────
+# Eureka Client
+# Registers as "scheduler-service" with Eureka Server on port 8761.
+# Admin Gateway routes /api/v1/admin/scheduler/** to this service.
+# ─────────────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+# ─────────────────────────────────────────────────────────────────
+# Actuator
+# Exposes /actuator/health for Eureka health checks.
+# ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ─────────────────────────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.hdfc.schedulerservice: DEBUG
+    org.springframework.kafka: INFO
