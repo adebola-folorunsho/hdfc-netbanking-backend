@@ -43,7 +43,7 @@ spring:
       # update: auto-creates/alters tables from entities during dev.
       # MUST be switched to validate before merging to main.
       # Schema changes in production are managed explicitly.
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
