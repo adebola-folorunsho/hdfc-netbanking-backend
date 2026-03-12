@@ -1,0 +1,90 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: notification-service
+
+  # ─────────────────────────────────────────────────────────────────
+  # JavaMailSender — Gmail SMTP configuration
+  # App password injected from environment variable — never hardcoded.
+  # Gmail requires an App Password when 2FA is enabled on the account.
+  # Generate at: Google Account → Security → App Passwords
+  # ─────────────────────────────────────────────────────────────────
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME}
+    password: ${GMAIL_APP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        connectiontimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+  # ─────────────────────────────────────────────────────────────────
+  # Kafka consumer configuration
+  # Upstash Kafka — SASL_SSL for secure cloud connection.
+  # group-id: notification-service — independent consumer group so
+  # Notification Service gets its own copy of every message,
+  # separate from audit-service consumer group.
+  # ─────────────────────────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
+
+# ─────────────────────────────────────────────────────────────────
+# Kafka topic names
+# Centralised here so topic names are never hardcoded in Java.
+# ─────────────────────────────────────────────────────────────────
+kafka:
+  topics:
+    transaction-events: transaction-events
+
+# ─────────────────────────────────────────────────────────────────
+# Eureka Client
+# Registers as "notification-service" with Eureka Server on 8761.
+# ─────────────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+# ─────────────────────────────────────────────────────────────────
+# Actuator
+# Exposes /actuator/health for Eureka health checks.
+# ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ─────────────────────────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.hdfc.notificationservice: DEBUG
+    org.springframework.kafka: INFO
+    org.springframework.mail: INFO
