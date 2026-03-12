@@ -3,17 +3,140 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- ─────────────────────────────────────────────────────────────────
+         Inherit version management from the parent POM.
+         Gives us Spring Boot 3.2.3, Spring Cloud 2023.0.1, Java 21.
+         ───────────────────────────────────────────────────────────────── -->
     <parent>
         <groupId>com.hdfc</groupId>
         <artifactId>hdfc-netbanking</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>currency-service</artifactId>
     <name>Currency Service</name>
-    <description>Currency Service</description>
+    <description>
+        Live exchange rate retrieval via ExchangeRate-API, with Redis
+        Read-Through caching (1-hour TTL). NGN is the base currency.
+        Rates are served to other services via REST — no Kafka, no DB.
+    </description>
+
+    <dependencies>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING BOOT WEB
+             Embeds Tomcat and enables REST controllers over HTTP.
+             Exposes /api/v1/currency/** endpoints to other services.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING WEBFLUX — WebClient only
+             Currency Service uses WebClient (non-blocking HTTP client)
+             to call the external ExchangeRate-API.
+             We are not building a reactive app — WebClient coexists
+             with spring-boot-starter-web on the same Tomcat instance.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SPRING DATA REDIS
+             Read-Through cache for exchange rates.
+             Cache key pattern: currency:rate:{fromCurrency}:{toCurrency}
+             TTL: 1 hour — rates are fetched from ExchangeRate-API once
+             per hour and served from Redis for all subsequent requests.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             EUREKA CLIENT
+             Registers as "currency-service" with Eureka Server (8761).
+             Allows other services to discover this service via
+             lb://currency-service for load-balanced calls.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             ACTUATOR
+             Exposes /actuator/health for Eureka health checks.
+             Without this, Eureka marks the service as OUT_OF_SERVICE.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             VALIDATION
+             Activates @Valid, @NotNull etc. on request DTOs.
+             Without this starter, Bean Validation annotations are
+             silently ignored at runtime.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             LOMBOK
+             Compile-time annotation processor for boilerplate reduction.
+             optional=true prevents transitive dependency leakage to
+             any module that depends on currency-service.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             TESTING
+             spring-boot-starter-test: JUnit 5, Mockito, AssertJ for
+             unit tests and slice tests.
+             ───────────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- ─────────────────────────────────────────────────────────
+                 SPRING BOOT MAVEN PLUGIN
+                 Packages as executable fat JAR for Railway deployment.
+                 Lombok excluded from final JAR — compile-only tool.
+                 ───────────────────────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
