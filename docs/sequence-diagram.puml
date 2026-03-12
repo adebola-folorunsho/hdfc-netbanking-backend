@@ -1,0 +1,42 @@
+@startuml
+title Fund Transfer Flow
+
+actor "Customer\n(Frontend)" as C
+participant "API Gateway\n:8080" as GW
+participant "Transaction Service\n:8083" as TS
+participant "Account Service\n:8082" as AS
+participant "Kafka\n(Upstash)" as K
+participant "Audit Service\n:8084" as AU
+participant "Notification Service\n:8085" as NS
+
+C -> GW: POST /api/v1/transactions/transfer\n{senderAccountId, receiverAccountId, amount, currency}\nAuthorization: Bearer <JWT>
+GW -> TS: Validate JWT + route to transaction-service
+
+note over TS: Saga Step 1
+TS -> TS: Create Transaction record\nstatus: PENDING
+
+note over TS,AS: Saga Step 2 — service JWT (ROLE_ADMIN)
+TS -> AS: GET /api/v1/accounts/{senderAccountId}/balance
+AS --> TS: 200 OK {balance: 50000.00 NGN}
+
+note over TS,AS: Saga Step 3 — debit sender
+TS -> AS: POST /api/v1/accounts/{senderAccountId}/debit\n{amount: 1000.00, currency: NGN}
+AS --> TS: 200 OK — debit successful
+
+note over TS,AS: Saga Step 4 — credit receiver
+TS -> AS: POST /api/v1/accounts/{receiverAccountId}/credit\n{amount: 1000.00, currency: NGN}
+AS --> TS: 200 OK — credit successful
+
+note over TS: Saga Step 5
+TS -> TS: Update Transaction status → SUCCESS
+
+note over TS,NS: Async — fire and forget
+TS -> K: Publish TRANSACTION_CREATED\ntopic: transaction-events
+K -> AU: Consume TRANSACTION_CREATED\nWrite immutable audit log
+K -> NS: Consume TRANSACTION_CREATED\nSend email/SMS alert to customer
+
+TS --> GW: 201 CREATED {transactionId, status: SUCCESS, amount: 1000.00 NGN}
+GW --> C: 201 CREATED
+
+note over TS: ⚠ Compensation: If credit fails after debit\n→ compensating credit back to sender\n→ Transaction marked FAILED
+@enduml
