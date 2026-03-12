@@ -1,0 +1,66 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: currency-service
+
+  # ─────────────────────────────────────────────────────────────────
+  # Redis configuration
+  # Read-Through cache for exchange rates — 1 hour TTL.
+  # Host and port match the Redis instance used by other services.
+  # ─────────────────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+# ─────────────────────────────────────────────────────────────────
+# Eureka Client
+# Registers as "currency-service" with Eureka Server on port 8761.
+# fetchRegistry: true — needed so this service can discover others.
+# registerWithEureka: true — needed so others can discover us.
+# ─────────────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+# ─────────────────────────────────────────────────────────────────
+# ExchangeRate-API configuration
+# API key injected from environment variable — never hardcoded.
+# Base URL for ExchangeRate-API v6 pair endpoint.
+# ─────────────────────────────────────────────────────────────────
+exchangerate:
+  api:
+    key: ${EXCHANGERATE_API_KEY}
+    base-url: https://v6.exchangerate-api.com/v6
+
+# ─────────────────────────────────────────────────────────────────
+# Actuator
+# Exposes /actuator/health for Eureka health checks.
+# Without health endpoint, Eureka marks service as OUT_OF_SERVICE.
+# ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ─────────────────────────────────────────────────────────────────
+# Logging
+# INFO level for our packages — DEBUG for cache hit/miss visibility
+# during development. Set to INFO in production.
+# ─────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.hdfc.currencyservice: DEBUG
+    org.springframework.data.redis: INFO
