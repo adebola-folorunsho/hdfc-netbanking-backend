@@ -1,0 +1,49 @@
+@startuml
+title Login Flow with 2FA — Activity Diagram
+
+start
+
+:Customer submits\nPOST /api/v1/auth/login\n{email, password};
+
+:API Gateway validates\nrequest format + routes\nto User Service;
+
+:User Service looks up\nuser by email;
+
+if (User exists?) then (no)
+  :Throw UserNotFoundException;
+  :Return 404 Not Found;
+  stop
+endif
+
+:Verify password against\nbcrypt hash;
+
+if (Password correct?) then (no)
+  :Return 401 Unauthorized;
+  stop
+endif
+
+if (2FA enabled?) then (yes)
+  :Return 200 OK\n{requires2FA: true, tempToken};
+  
+  :Customer submits\nPOST /api/v1/2fa/validate\n{tempToken, totpCode};
+  
+  :Validate TOTP code\nagainst stored secret\nvia GoogleAuthenticator;
+  
+  if (TOTP valid?) then (no)
+    :Throw InvalidOtpException;
+    :Return 401 Unauthorized;
+    stop
+  endif
+else (no)
+endif
+
+:Generate JWT access token\n{subject: email, role: ROLE_X,\nuserId: UUID, expiry: 15min};
+
+:Generate refresh token\nStore in Redis\nkey: user:refresh:{userId}\nTTL: 7 days;
+
+:Store session in Redis\nkey: user:session:{userId}\nTTL: 15 minutes;
+
+:Return 200 OK\n{accessToken, refreshToken,\nuserId, role, expiresIn};
+
+stop
+@enduml
