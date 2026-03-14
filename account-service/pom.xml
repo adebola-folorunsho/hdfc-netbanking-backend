@@ -199,6 +199,11 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>springboot3-dotenv</artifactId>
+        </dependency>
+
         <!-- ─────────────────────────────────────────────────────────
              TESTING
              spring-boot-starter-test bundles JUnit 5, Mockito,

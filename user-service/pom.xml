@@ -131,6 +131,11 @@
             <version>1.6.3</version>
         </dependency>
 
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>springboot3-dotenv</artifactId>
+        </dependency>
+
         <!-- ───────────────────────────────────────────────────
              TESTING
              ─────────────────────────────────────────────────── -->
