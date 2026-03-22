@@ -1,5 +1,3 @@
-version: '3.8'
-
 # =============================================================================
 # HDFC NetBanking — Full Stack Docker Compose
 # Runs all 10 microservices + MySQL + Redis + Kafka locally.
