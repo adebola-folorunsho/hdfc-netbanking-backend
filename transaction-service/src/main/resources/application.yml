@@ -16,9 +16,9 @@ spring:
     # Transaction Service owns hdfc_transaction_db exclusively.
     # Never touches hdfc_account_db or hdfc_user_db directly —
     # cross-service data access goes through REST calls only.
-    url: jdbc:mysql://localhost:3306/hdfc_transaction_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: hdfc_user
-    password: hdfc_password
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/hdfc_transaction_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQL_USERNAME:hdfc_user}
+    password: ${MYSQL_PASSWORD:hdfc_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
     hikari:
@@ -45,7 +45,7 @@ spring:
     show-sql: true
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       # Each transaction event is serialised as JSON.
       # StringSerializer for keys (transaction ID as string).
@@ -106,7 +106,7 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
     lease-renewal-interval-in-seconds: 30

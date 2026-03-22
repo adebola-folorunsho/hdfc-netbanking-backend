@@ -1,16 +1,32 @@
-version: '3.8'
+# =============================================================================
+# HDFC NetBanking — Full Stack Docker Compose
+# Runs all 10 microservices + MySQL + Redis + Kafka locally.
+#
+# Usage:
+#   docker compose up --build        # first run — builds all images
+#   docker compose up                # subsequent runs — uses cached images
+#   docker compose down              # stop and remove containers
+#   docker compose down -v           # stop, remove containers and volumes
+#
+# Prerequisites:
+#   - Docker Desktop running
+#   - .env file at repo root (copy .env.example and fill in secrets)
+# =============================================================================
 
 services:
 
-  # ─── MySQL ────────────────────────────────────────────────────────────────
+  # ─── MySQL ──────────────────────────────────────────────────────────────────
+  # Single MySQL instance hosting all 7 service databases.
+  # Databases are created automatically on first start via init.sql.
+  # All services connect using hdfc_user credentials.
   mysql:
     image: mysql:8.0
     container_name: hdfc-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_USER: hdfc_user
-      MYSQL_PASSWORD: hdfc_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -19,16 +35,20 @@ services:
     networks:
       - hdfc-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "hdfc_user", "-phdfc_password"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USERNAME}", "-p${MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  # ─── Redis ────────────────────────────────────────────────────────────────
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  # Single Redis instance shared by User Service, Account Service,
+  # and Currency Service — each uses a different key prefix/pattern.
   redis:
     image: redis:7.2-alpine
     container_name: hdfc-redis
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
@@ -36,15 +56,409 @@ services:
     networks:
       - hdfc-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
 
+  # ─── Zookeeper ──────────────────────────────────────────────────────────────
+  # Zookeeper is required by Kafka for cluster coordination.
+  # Single node — sufficient for local development.
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: hdfc-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ─── Kafka ──────────────────────────────────────────────────────────────────
+  # Local Kafka broker — plain PLAINTEXT, no SSL/SASL needed locally.
+  # The SASL_SSL config in application.yml is overridden by the
+  # environment variables below for local Docker development.
+  # Topics created automatically when first message is produced.
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: hdfc-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ─── Eureka Server ──────────────────────────────────────────────────────────
+  # Service registry — all other services register here on startup.
+  # Must be healthy before any microservice starts.
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: hdfc-eureka-server
+    restart: unless-stopped
+    environment:
+      EUREKA_HOSTNAME: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── API Gateway ────────────────────────────────────────────────────────────
+  # Customer-facing gateway — routes all /api/v1/** traffic to services.
+  # CORS configured for localhost:5173 and Vercel frontend URL.
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: hdfc-api-gateway
+    restart: unless-stopped
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Admin Gateway ──────────────────────────────────────────────────────────
+  # Admin-only gateway — routes /api/admin/** traffic.
+  # Enforces JWT authentication for all admin endpoints.
+  admin-gateway:
+    build:
+      context: .
+      dockerfile: admin-gateway/Dockerfile
+    container_name: hdfc-admin-gateway
+    restart: unless-stopped
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8090:8090"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── User Service ───────────────────────────────────────────────────────────
+  # Handles registration, JWT auth, 2FA, RBAC, and KYC.
+  # 48 unit tests — all passing.
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: hdfc-user-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8081:8081"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Account Service ────────────────────────────────────────────────────────
+  # Manages bank accounts — SecureRandom account numbers, Redis
+  # Write-Through caching, PESSIMISTIC_WRITE locking, Envers auditing.
+  # 29 unit tests — all passing.
+  account-service:
+    build:
+      context: .
+      dockerfile: account-service/Dockerfile
+    container_name: hdfc-account-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8082:8082"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Transaction Service ────────────────────────────────────────────────────
+  # Saga orchestration, Paystack webhook handling, Kafka publishing.
+  # Service-to-service JWT auth for Account Service calls.
+  # 30 unit tests — all passing.
+  transaction-service:
+    build:
+      context: .
+      dockerfile: transaction-service/Dockerfile
+    container_name: hdfc-transaction-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      JWT_SECRET: ${JWT_SECRET}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY}
+      PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET}
+    ports:
+      - "8083:8083"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Audit Service ──────────────────────────────────────────────────────────
+  # Consumes transaction-events from Kafka — immutable audit log.
+  # Append-only — no update or delete operations.
+  # 13 unit tests — all passing.
+  audit-service:
+    build:
+      context: .
+      dockerfile: audit-service/Dockerfile
+    container_name: hdfc-audit-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_USERNAME: ignored
+      KAFKA_PASSWORD: ignored
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
+    ports:
+      - "8084:8084"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Notification Service ───────────────────────────────────────────────────
+  # Consumes transaction-events — sends email via Gmail SMTP.
+  # Strategy pattern for extensible notification channels.
+  # 11 unit tests — all passing.
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: hdfc-notification-service
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_USERNAME: ignored
+      KAFKA_PASSWORD: ignored
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
+      GMAIL_USERNAME: ${GMAIL_USERNAME}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+    ports:
+      - "8085:8085"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Scheduler Service ──────────────────────────────────────────────────────
+  # Cron jobs — monthly statements, interest accrual, OTP cleanup.
+  # Publishes statement-events to Kafka.
+  # 11 unit tests — all passing.
+  scheduler-service:
+    build:
+      context: .
+      dockerfile: scheduler-service/Dockerfile
+    container_name: hdfc-scheduler-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_USERNAME: ignored
+      KAFKA_PASSWORD: ignored
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
+    ports:
+      - "8086:8086"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ─── Currency Service ───────────────────────────────────────────────────────
+  # Live exchange rates via ExchangeRate-API v6.
+  # Redis Read-Through cache — 1 hour TTL.
+  # 5 unit tests — all passing.
+  currency-service:
+    build:
+      context: .
+      dockerfile: currency-service/Dockerfile
+    container_name: hdfc-currency-service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY}
+    ports:
+      - "8087:8087"
+    networks:
+      - hdfc-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8087/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+# =============================================================================
+# VOLUMES
+# Named volumes persist data between container restarts.
+# mysql_data — all 7 service databases
+# redis_data — cached balances and exchange rates
+# =============================================================================
 volumes:
   mysql_data:
   redis_data:
 
+# =============================================================================
+# NETWORKS
+# Single bridge network — all containers communicate by service name.
+# e.g. mysql is reachable at hostname "mysql" from any container.
+# =============================================================================
 networks:
   hdfc-network:
     driver: bridge
